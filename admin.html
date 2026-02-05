@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ITIP教學遊戲平台 (教師端)</title>
+    <link rel="icon" href="https://lh3.googleusercontent.com/d/1C2gB-y7KclGxeZMaAtZRh3svVVo5mnlj=w1000" type="image/png">
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #f4f4f9; color: #333; }
+        
+        /* --- 頂部導覽列 (Header & Nav) --- */
+        .nav-header {
+            display: flex; align-items: center; justify-content: space-between;
+            background: white; padding: 15px 20px; border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 20px;
+            flex-wrap: wrap; gap: 20px;
+        }
+
+        /* 左側：Logo 與標題區 */
+        .brand-area { display: flex; align-items: center; gap: 15px; }
+        .brand-logo { height: 50px; width: auto; object-fit: contain; } /* 自動縮放 */
+        .brand-text { display: flex; flex-direction: column; }
+        .brand-title { font-size: 20px; font-weight: bold; color: #2c3e50; line-height: 1.2; }
+        .brand-author { font-size: 12px; color: #888; text-align: right; margin-top: 2px; font-style: italic; }
+
+        /* 右側：導覽按鈕區 */
+        .nav-tabs { display: flex; gap: 10px; border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
+        .nav-btn {
+            background: #f8f9fa; border: 1px solid #eee; padding: 8px 16px;
+            font-size: 16px; cursor: pointer; color: #666; border-radius: 6px;
+            transition: all 0.2s;
+        }
+        .nav-btn.active { background: #4a90e2; color: white; border-color: #4a90e2; font-weight: bold; }
+        .nav-btn:hover:not(.active) { background: #eef6ff; }
+        .btn-logout { background-color: #6c757d; color: white; margin-left: auto; }
+        .btn-logout:hover { background-color: #5a6268; }
+
+        /* 手機版適配：標題太長時換行 */
+        @media (max-width: 768px) {
+            .nav-header { flex-direction: column; align-items: flex-start; }
+            .nav-tabs { width: 100%; overflow-x: auto; padding-bottom: 5px; }
+            .btn-logout { margin-left: 0; }
+        }
+
+        /* --- 視圖控制 --- */
+        .view-section { display: none; }
+        .view-section.active { display: block; }
+
+        /* --- 通用表單樣式 --- */
+        .form-group { margin-bottom: 15px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        
+        .editor-section { display: none; margin-top: 15px; border-top: 1px dashed #eee; padding-top: 15px; }
+        .editor-section.active { display: block; }
+
+        button { cursor: pointer; }
+        .btn-remove { background: #ff6b6b; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+        .btn-add { background: #51cf66; color: white; border: none; padding: 10px 20px; border-radius: 4px; }
+        .btn-submit { background: #4a90e2; color: white; border: none; padding: 12px 24px; border-radius: 4px; width: 100%; font-size: 18px; margin-top: 20px; }
+        .btn-submit.editing { background: #ff9800; } /* 編輯模式變橘色 */
+        .btn-submit:disabled { background: #ccc; }
+
+        /* --- 管理列表樣式 (升級版) --- */
+        .filter-bar { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+        .filter-bar input, .filter-bar select { flex: 1; min-width: 120px; padding: 10px; border: 1px solid #ddd; border-radius: 6px; }
+        
+        .manage-list { list-style: none; padding: 0; }
+        .manage-item { background: white; margin-bottom: 10px; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .manage-info { flex: 1; min-width: 200px; }
+        .manage-title { font-weight: bold; font-size: 18px; color: #2c3e50; }
+        .manage-meta { font-size: 14px; color: #888; margin-top: 5px; display: flex; gap: 10px; align-items: center; }
+        .tag-type { background: #e3f2fd; color: #4a90e2; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        
+        .manage-actions { display: flex; gap: 8px; }
+        .btn-sm { padding: 8px 12px; font-size: 14px; border-radius: 4px; color: white; border: none; cursor: pointer; transition: opacity 0.2s; }
+        .btn-sm:hover { opacity: 0.9; }
+        .btn-edit { background: #ffc107; color: #333; }
+        .btn-play { background: #17a2b8; }
+        .btn-del { background: #dc3545; }
+        .btn-link { background: #6c757d; } /* 前往大廳按鈕 */
+
+        /* --- 編輯器內部樣式 --- */
+        .pair-row, .option-row, .sentence-row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+        .quiz-item { border: 1px solid #eee; padding: 15px; margin-bottom: 15px; border-radius: 8px; background: #fafafa; }
+        .quiz-item input[type="radio"] { width: auto; transform: scale(1.5); }
+        .preview-tags { margin-top: 5px; display: flex; flex-wrap: wrap; gap: 5px; min-height: 20px; }
+        .tag { background: #e3f2fd; color: #4a90e2; padding: 4px 8px; border-radius: 4px; font-size: 14px; border: 1px solid #b6d4fe; }
+
+        /* --- 結果表格 --- */
+        table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-radius: 8px; overflow: hidden; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #4a90e2; color: white; cursor: pointer; user-select: none; }
+        th:hover { background: #357abd; }
+        tr:hover { background: #f9f9f9; }
+        .score-high { color: #28a745; font-weight: bold; }
+        .score-low { color: #dc3545; }
+
+        /* --- Admin Login --- */
+        #login-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f0f4f8; display: flex; align-items: center; justify-content: center; z-index: 9999; }
+        .login-card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 350px; text-align: center; }
+        .login-card h2 { margin-top: 0; color: #333; }
+        .login-card input { margin-bottom: 15px; }
+        .login-card button { width: 100%; background: #2c3e50; font-size: 20px; color: white; }
+        
+        #admin-panel { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="login-screen">
+        <div class="login-card">
+            <h2>教師後台登入</h2>
+            <input type="text" id="admin-user" placeholder="帳號">
+            <input type="password" id="admin-pass" placeholder="密碼">
+            <button onclick="adminLogin()">登入</button>
+            <p id="login-msg" style="color:red; font-size:15px; margin-top:10px;"></p>
+        </div>
+    </div>
+
+    <div class="nav-header">
+        <div class="brand-area">
+            <img src="https://lh3.googleusercontent.com/d/1LdXqglFsmSyb5krrvMwhbcfSy3zRw5ll=w1000" alt="Logo" class="brand-logo">
+            <div class="brand-text">
+                <span class="brand-title">ITIP教學遊戲平台 <span style="font-size:0.9em; font-weight:normal;">(I Teach, I Play)</span></span>
+                <span class="brand-author">by AaronShi.cc</span>
+            </div>
+        </div>
+
+        <div class="nav-tabs">
+            <button class="nav-btn active" onclick="switchView('create')">製作遊戲 (Create)</button>
+            <button class="nav-btn" onclick="switchView('manage')">管理遊戲 (Manage)</button>
+            <button class="nav-btn" onclick="switchView('results')">學生成績 (Results)</button>
+            <button class="nav-btn" 
+                onclick="window.open('index.html', '_blank')" 
+                style="margin-left: auto; background-color: #5095d1; color: white;">學生端</button>
+            <button class="nav-btn" onclick="adminLogout()" style="margin-left: auto; background-color: #6c757d; color: white;">登出</button>
+        </div>
+    </div>
+
+        <div id="view-create" class="view-section active">
+            <h2 id="create-header">建立新遊戲</h2>
+            <div id="edit-mode-bar" style="display:none; background:#fff3cd; color:#856404; padding:10px; margin-bottom:15px; border-radius:5px; border:1px solid #ffeeba;">
+                ⚠️ 正在編輯模式 
+                <button class="btn-sm btn-del" onclick="cancelEdit()" style="margin-left:10px; float:right;">取消編輯並返回</button>
+                <div style="clear:both;"></div>
+            </div>
+
+            <div class="form-group">
+                <label>遊戲標題</label>
+                <input type="text" id="game-title" placeholder="例如：Unit 1 隨堂測驗">
+            </div>
+            <div class="form-group">
+                <label>選擇遊戲類型</label>
+                <select id="game-type" onchange="switchEditor()">
+                    <option value="match_up">Match Up (配對)</option>
+                    <option value="flip_tiles">Concentration (翻牌配對)</option>
+                    <option value="unscramble">Sentence Unscrambler (句子重組)</option>
+                    <option value="word_unscramble">Word Unscrambler (單字重組)</option>
+                    <option value="quiz">Quiz (選擇題)</option>
+                    <option value="true_false">True/False (是非題)</option>
+                    <option value="grouping">Grouping (分類選擇)</option>
+                    <option value="missing_word">Missing Word (填空-拼字)</option>
+                    <option value="gap_fill">Gap Fill (填空-配合)</option>
+                    <option value="spot_mistake">Spot the Mistake (改錯字)</option>
+                    <option value="prompt_dealing">Dealing Prompt (提示卡-發牌)</option>
+                    <option value="prompt_flipping">Flipping Prompt (提示卡-翻牌)</option>
+                    <option value="random_wheel">Random Wheel (轉盤)</option>
+                    <option value="maze_chase">Maze Chase (迷宮)</option>
+                </select>
+            </div>
+
+            <div id="editor-match_up" class="editor-section active">
+                <div id="pairs-container"></div>
+                <button class="btn-add" onclick="addPair()">+ 新增配對</button>
+            </div>
+            <div id="editor-unscramble" class="editor-section">
+                <div style="margin-bottom:10px; font-size:14px; color:#666;">系統會以空白鍵自動切分單字。</div>
+                <div id="sentences-container"></div>
+                <button class="btn-add" onclick="addSentence()">+ 新增句子</button>
+            </div>
+            <div id="editor-quiz" class="editor-section">
+                <div id="quiz-container"></div>
+                <button class="btn-add" onclick="addQuizQuestion()">+ 新增一題</button>
+            </div>
+            <div id="editor-word_unscramble" class="editor-section">
+                <div id="words-container"></div>
+                <button class="btn-add" onclick="addWordQuestion()">+ 新增單字</button>
+            </div>
+            <div id="editor-grouping" class="editor-section">
+                <div style="margin-bottom:10px; font-size:14px; color:#666;">
+                    說明：請輸入分類名稱，並在右側輸入屬於該分類的項目，用<b>半形逗號 (,)</b> 隔開。<br>
+                    例如：分類「紅色」 | 項目「蘋果, 消防車, 草莓」
+                </div>
+                <div id="grouping-container"></div>
+                <button class="btn-add" onclick="addGroupRow()">+ 新增分類</button>
+            </div>
+            <div id="editor-missing_word" class="editor-section">
+                <div style="margin-bottom:10px; font-size:14px; color:#666;">
+                    說明：請將要讓學生填寫的單字用 <b>[ ]</b> 包起來。<br>
+                    例如輸入：I like to eat <b>[apples]</b>. <br>
+                    學生會看到：I like to eat _______. <br>
+                    如果需要提示，請自行在後方加入夾注，例如：I like to eat _______.<b></b>(我喜歡吃蘋果)</b><br>
+                    <b>注意！一題僅可包含一個填空</b>
+                </div>
+                <div style="margin-bottom: 5px;">
+                    <label><input type="checkbox" id="missing-strict-mode" style="width: 20px; height: 20px;">啟用「嚴格區分大小寫」 (Case Sensitive)</label>
+                </div>
+                <div id="missing-container"></div>
+                <button class="btn-add" onclick="addMissingRow()">+ 新增填空</button>
+            </div>
+            <div id="editor-gap_fill" class="editor-section">
+                    <div style="margin-bottom:10px; font-size:14px; color:#666;">
+                    說明：請輸入句子或段落，將要挖空的單字用 <b>[ ]</b> 包起來。<br>
+                    例如：The [sun] rises in the [east]. <br>
+                    遊戲開始時，所有句子會一起出現，所有括號內的字會變成上方的選項庫。
+                </div>
+                <div id="gap-container"></div>
+                <button class="btn-add" onclick="addGapRow()">+ 新增句子</button>
+            </div>
+            <div id="editor-spot_mistake" class="editor-section">
+                    <div style="margin-bottom:10px; font-size:14px; color:#666;">
+                    說明：請輸入包含錯誤的完整句子，並指定哪個單字是錯的，以及正確答案。<br>
+                    例如：句子「She don't like apples」 | 錯誤字「don't」 | 正確字「doesn't」
+                </div>
+                <div id="mistake-container"></div>
+                <button class="btn-add" onclick="addMistakeRow()">+ 新增改錯題</button>
+            </div>
+            <div id="editor-true_false" class="editor-section">
+                <div id="tf-container"></div>
+                <button class="btn-add" onclick="addTFRow()">+ 新增是非題</button>
+            </div>
+            <div id="editor-prompts" class="editor-section">
+                <div style="margin-bottom:10px; font-size:14px; color:#666;">
+                    說明：請輸入任務內容（例如：自我介紹、唱一首歌、造句...）。<br>
+                    「發牌模式」會一次顯示一張；「翻牌模式」會一次顯示全部卡背供學生抽選。
+                </div>
+                <div id="prompts-container"></div>
+                <button class="btn-add" onclick="addPromptRow()">+ 新增任務卡</button>
+
+            </div>
+            <div id="editor-random_wheel" class="editor-section">
+                <div style="margin-bottom:10px; font-size:14px; color:#666;">
+                    說明：請輸入轉盤上的選項（例如：座號、姓名、獎勵、任務）。<br>
+                    建議至少輸入 2 個以上的選項。
+                </div>
+                <div id="wheel-container"></div>
+                <button class="btn-add" onclick="addWheelSegment()">+ 新增選項</button>
+            </div>
+            <div id="editor-maze_chase" class="editor-section">
+                <div style="margin-bottom:10px; font-size:14px; color:#666;">
+                    說明：請輸入完整句子。遊戲中，單字會被打散在迷宮中，學生需依序收集。<br>
+                    建議句子不要太長（約 3-8 個單字最佳），以免迷宮太擁擠。
+                </div>
+                <div id="maze-container"></div>
+                <button class="btn-add" onclick="addMazeRow()">+ 新增句子</button>
+            </div>
+
+            <button class="btn-submit" id="btn-submit" onclick="submitGame()">儲存遊戲到資料庫</button>
+            <div id="status"></div>
+        </div>
+
+        <div id="view-manage" class="view-section">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h2 style="margin:0;">管理現有遊戲</h2>
+                <button class="btn-sm btn-link" onclick="window.open('index.html?preview=true', '_blank')" style="font-size:16px; padding:10px 15px;">➚ 前往學生端試玩（無痕模式）</button>
+            </div>
+            
+            <div class="filter-bar">
+                <input type="text" id="manage-search" placeholder="搜尋標題..." oninput="renderManageList()">
+                <select id="manage-filter-type" onchange="renderManageList()">
+                    <option value="all">所有類型</option>
+                    </select>
+                <select id="manage-sort" onchange="renderManageList()">
+                    <option value="date-desc">日期：新 → 舊</option>
+                    <option value="date-asc">日期：舊 → 新</option>
+                    <option value="name-asc">名稱：A → Z</option>
+                </select>
+            </div>
+
+            <div id="manage-loading" style="text-align:center;">載入中...</div>
+            <ul id="manage-list" class="manage-list"></ul>
+        </div>
+
+        <div id="view-results" class="view-section">
+            <h2>學生成績</h2>
+            <div class="filter-bar">
+                <input type="text" id="filter-text" placeholder="搜尋姓名、班級..." oninput="filterRecords()">
+                <button class="btn-add" onclick="fetchRecords()" style="width: auto;">重新整理</button>
+            </div>
+            <div style="overflow-x:auto;">
+                <table>
+                    <thead><tr><th>日期</th><th>遊戲</th><th>班級</th><th>座號</th><th>姓名</th><th>分數</th><th>耗時</th></tr></thead>
+                    <tbody id="records-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // ★ 請換成你的 GAS Web App URL
+    const GAS_URL = 'https://script.googleusercontent.com/macros/echo?user_content_key=AehSKLiRgywADsEXATpUofhgZx0PycaMxQXytWpxqrVsdux2DxHnTVrqieq0QsJz29VwKBM4x5iuOVL7OKzGmm9TtY9Jbeaa1aIp2kfGHHTMlicvEuzQRy9IWo82sKfWb03Io11ZaTNjpK6qnajUv_NBpm3OeytP3g9PFJgR2X38KildMvdMRL-s8H6dkyOm6Vo70IAiqtxh5HBXtW0bSD_ramuzrD6YFM5WjsnbJp9MFihB2MTzfyIwB_w0B6tYcNep3q1xVY5scLjajAZamBWQvt-XFne_5Q&lib=Mw-pwKyRQGo2mBx6Tmf6Mz_55L4N5BRKM'; 
+
+    let allGames = [];
+    let allRecords = [];
+    let editingGameId = null; 
+
+    // Login Check
+    if (localStorage.getItem('admin_logged_in') === 'true') {
+        document.body.classList.add('logged-in');
+    }
+
+    // ★★★ window.onload ★★★
+    window.onload = function() {
+        if (localStorage.getItem('admin_logged_in') === 'true') {
+            showAdminPanel();
+        }
+        // 初始化編輯器
+        resetEditors();
+    };
+
+    function resetEditors() {
+        // 清空所有容器
+        const containers = ['pairs', 'sentences', 'quiz', 'words', 'grouping', 'missing', 'gap', 'mistake', 'tf', 'prompts', 'wheel', 'maze'];
+        containers.forEach(c => {
+            const el = document.getElementById(c + '-container');
+            if(el) el.innerHTML = '';
+        });
+        
+        // 重新加入預設的一行 (避免空空如也)
+        addPair(); addSentence(); addQuizQuestion(); addWordQuestion(); addGroupRow();
+        addMissingRow(); addGapRow(); addMistakeRow(); addTFRow();
+        addPromptRow(); addWheelSegment(); addMazeRow();
+        
+        // 重置標題和設定
+        document.getElementById('game-title').value = '';
+        const strictMode = document.getElementById('missing-strict-mode');
+        if(strictMode) strictMode.checked = false;
+        
+        document.getElementById('status').style.display = 'none';
+    }
+
+    function adminLogin() {
+        const u = document.getElementById('admin-user').value.trim();
+        const p = document.getElementById('admin-pass').value.trim();
+        if(!u || !p) return;
+        
+        fetch(GAS_URL + `?action=login&user=${encodeURIComponent(u)}&pass=${encodeURIComponent(p)}`)
+        .then(r=>r.json()).then(d=>{
+            if(d.success) {
+                localStorage.setItem('admin_logged_in', 'true');
+                showAdminPanel();
+            } else alert('帳號密碼錯誤');
+        });
+    }
+
+    function adminLogout() {
+        localStorage.removeItem('admin_logged_in');
+        document.body.classList.remove('logged-in');
+        document.getElementById('admin-panel').style.display = 'none';
+        document.getElementById('login-screen').style.display = 'flex';
+        // 清空欄位
+        document.getElementById('admin-user').value = '';
+        document.getElementById('admin-pass').value = '';
+    }
+
+    function showAdminPanel() {
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('admin-panel').style.display = 'block';
+    }
+
+    function switchView(view) {
+        document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById('view-' + view).classList.add('active');
+        
+        const map = {'create':0, 'manage':1, 'results':2};
+        document.querySelectorAll('.nav-btn')[map[view]].classList.add('active');
+
+        if (view === 'manage') fetchManageList();
+        if (view === 'results') fetchRecords();
+    }
+
+    function switchEditor() {
+        const type = document.getElementById('game-type').value;
+        document.querySelectorAll('.editor-section').forEach(el => el.classList.remove('active'));
+        
+        if (type === 'flip_tiles') document.getElementById('editor-match_up').classList.add('active');
+        else if (type === 'prompt_dealing' || type === 'prompt_flipping') document.getElementById('editor-prompts').classList.add('active');
+        else document.getElementById('editor-' + type).classList.add('active');
+    }
+
+    // ==========================================
+    // Manage Logic
+    // ==========================================
+    
+    function fetchManageList() {
+        const list = document.getElementById('manage-list');
+        document.getElementById('manage-loading').style.display = 'block';
+        list.innerHTML = '';
+
+        fetch(GAS_URL + '?action=getGameList')
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('manage-loading').style.display = 'none';
+            if (data.games) {
+                allGames = data.games; // 原始資料
+                generateManageTypeOptions(); // 產生下拉選單
+                renderManageList(); // 渲染列表
+            }
+        });
+    }
+
+    function generateManageTypeOptions() {
+        const select = document.getElementById('manage-filter-type');
+        // 保留第一項 "所有類型"
+        select.innerHTML = '<option value="all">所有類型</option>';
+        
+        // 抓出所有不重複類型
+        const types = [...new Set(allGames.map(g => g.type))];
+        // 簡易對照表
+        const typeNameMap = {
+            'match_up': '配對', 'quiz': '選擇題', 'grouping': '分類', 'unscramble': '句子重組',
+            'word_unscramble': '單字重組', 'missing_word': '填空(拼)', 'gap_fill': '填空(選)',
+            'flip_tiles': '翻牌', 'spot_mistake': '改錯',
+            'true_false': '是非', 'prompt_dealing': '發牌', 'prompt_flipping': '翻牌(全)',
+            'random_wheel': '轉盤', 'maze_chase': '迷宮'
+        };
+
+        types.forEach(t => {
+            const op = document.createElement('option');
+            op.value = t;
+            op.innerText = typeNameMap[t] || t;
+            select.appendChild(op);
+        });
+    }
+
+    function renderManageList() {
+        const key = document.getElementById('manage-search').value.toLowerCase();
+        const typeFilter = document.getElementById('manage-filter-type').value;
+        const sortMode = document.getElementById('manage-sort').value;
+        const list = document.getElementById('manage-list');
+        list.innerHTML = '';
+        
+        // 1. Filter
+        let filtered = allGames.filter(g => {
+            const matchKey = (g.title + g.type).toLowerCase().includes(key);
+            const matchType = (typeFilter === 'all' || g.type === typeFilter);
+            return matchKey && matchType;
+        });
+
+        // 2. Sort
+        filtered.sort((a, b) => {
+            const tA = a.timestamp || 0;
+            const tB = b.timestamp || 0;
+            if (sortMode === 'date-desc') return tB - tA;
+            if (sortMode === 'date-asc') return tA - tB;
+            if (sortMode === 'name-asc') return String(a.title).localeCompare(String(b.title), 'zh-TW');
+            return 0;
+        });
+        
+        // 3. Render
+        const typeNameMap = {
+            'match_up': '配對', 'quiz': '選擇題', 'grouping': '分類', 'unscramble': '句子重組',
+            'word_unscramble': '單字重組', 'missing_word': '填空(拼)', 'gap_fill': '填空(選)',
+            'flip_tiles': '翻牌', 'spot_mistake': '改錯',
+            'true_false': '是非', 'prompt_dealing': '發牌', 'prompt_flipping': '翻牌(全)',
+            'random_wheel': '轉盤', 'maze_chase': '迷宮'
+        };
+
+        filtered.forEach(g => {
+            const li = document.createElement('li');
+            li.className = 'manage-item';
+            const dateStr = g.timestamp ? new Date(g.timestamp).toLocaleDateString() : '';
+
+            li.innerHTML = `
+                <div class="manage-info">
+                    <div class="manage-title">${g.title}</div>
+                    <div class="manage-meta">
+                        <span class="tag-type">${typeNameMap[g.type] || g.type}</span>
+                        ${dateStr ? `<span>📅 ${dateStr}</span>` : ''}
+                    </div>
+                </div>
+                <div class="manage-actions">
+                    <button class="btn-sm btn-play" style="background:#17a2b8;" onclick="shareStudentLink('${g.id}')">🔗 分享連結</button>
+                    <button class="btn-sm btn-edit" onclick="startEdit('${g.id}')">編輯</button>
+                    <button class="btn-sm btn-del" onclick="deleteGame('${g.id}')">刪除</button>
+                </div>
+            `;
+            list.appendChild(li);
+        });
+    }
+
+    function shareStudentLink(gameId) {
+        // 邏輯：把目前的 admin.html 換成 index.html
+        // 例如：.../itip/admin.html -> .../itip/index.html?gameId=...
+        let studentUrl = window.location.href.split('?')[0];
+        
+        if (studentUrl.includes('admin.html')) {
+            studentUrl = studentUrl.replace('admin.html', 'index.html');
+        } else if (studentUrl.endsWith('/')) {
+            // 如果網址是目錄結尾 (例如 .../itip/)，直接加上 index.html
+            studentUrl += 'index.html';
+        } else {
+            // 其他情況，嘗試直接替換最後一段
+            const path = studentUrl.substring(0, studentUrl.lastIndexOf('/') + 1);
+            studentUrl = path + 'index.html';
+        }
+
+        const shareUrl = `${studentUrl}?gameId=${gameId}`;
+
+        navigator.clipboard.writeText(shareUrl).then(() => {
+            alert('學生遊玩連結已複製！\n' + shareUrl);
+        }).catch(err => {
+            prompt('請手動複製連結：', shareUrl);
+        });
+    }
+    
+    function deleteGame(id) {
+        if(!confirm('確定要刪除這個遊戲嗎？刪除後無法復原。')) return;
+        
+        fetch(GAS_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'deleteGame', gameId: id })
+        }).then(r=>r.json()).then(d => {
+            if(d.success) {
+                alert('刪除成功');
+                fetchManageList();
+            } else alert('刪除失敗');
+        });
+    }
+
+    function startEdit(id) {
+        fetch(GAS_URL + `?action=getGame&gameId=${id}`)
+        .then(res => res.json())
+        .then(data => {
+            if(data.error) { alert('讀取失敗'); return; }
+            
+            switchView('create'); 
+            resetEditors(); 
+
+            editingGameId = id;
+            document.getElementById('create-header').innerText = "編輯遊戲: " + data.title;
+            
+            const btn = document.getElementById('btn-submit');
+            btn.innerText = "更新遊戲 (Update)";
+            btn.classList.add('editing');
+            btn.disabled = false; // ★★★ 關鍵修正：強制啟用按鈕 ★★★
+            
+            document.getElementById('edit-mode-bar').style.display = 'block';
+
+            document.getElementById('game-title').value = data.title;
+            document.getElementById('game-type').value = data.type;
+            switchEditor();
+
+            populateEditor(data.type, data.content);
+        });
+    }
+
+    function cancelEdit() {
+        editingGameId = null;
+        document.getElementById('create-header').innerText = "建立新遊戲";
+        
+        const btn = document.getElementById('btn-submit');
+        btn.innerText = "儲存遊戲到資料庫";
+        btn.classList.remove('editing');
+        btn.disabled = false; // ★★★ 關鍵修正：強制啟用按鈕 ★★★
+        
+        document.getElementById('edit-mode-bar').style.display = 'none';
+        resetEditors();
+        switchView('manage');
+    }
+
+    function populateEditor(type, content) {
+        // 定義對應容器
+        const map = {
+            'match_up': 'pairs', 'flip_tiles': 'pairs', 'unscramble': 'sentences', 
+            'quiz': 'quiz', 'word_unscramble': 'words', 'grouping': 'grouping',
+            'missing_word': 'missing', 'gap_fill': 'gap',
+            'spot_mistake': 'mistake', 'true_false': 'tf', 'prompt_dealing': 'prompts',
+            'prompt_flipping': 'prompts', 'random_wheel': 'wheel', 'maze_chase': 'maze'
+        };
+        const containerId = map[type] + '-container';
+        if(containerId) document.getElementById(containerId).innerHTML = '';
+
+        // 依類型填充
+        if (type === 'match_up' || type === 'flip_tiles') {
+            content.pairs.forEach(p => {
+                document.getElementById('pairs-container').appendChild(createRow('pair-row', `<input type="text" class="input-q" value="${p.q}"><input type="text" class="input-a" value="${p.a}"><button class="btn-remove" onclick="this.parentElement.remove()">X</button>`));
+            });
+        } else if (type === 'unscramble') {
+            content.questions.forEach(q => {
+                const d = createRow('sentence-row', `<div style="flex:1;"><input type="text" class="input-s" value="${q.text}" oninput="previewSegments(this)" style="width:100%;"><div class="preview-tags"></div></div><button class="btn-remove" onclick="this.parentElement.remove()">X</button>`);
+                document.getElementById('sentences-container').appendChild(d);
+                previewSegments(d.querySelector('.input-s')); 
+            });
+        } else if (type === 'quiz') {
+            content.questions.forEach((q, idx) => {
+                const div = document.createElement('div'); div.className = 'quiz-item';
+                let optsHTML = '';
+                const correctIndex = q.options.indexOf(q.a);
+                for(let i=0; i<4; i++) {
+                    const val = q.options[i] || '';
+                    const checked = (i === correctIndex) ? 'checked' : '';
+                    optsHTML += `<div class="option-row"><input type="radio" name="q-${idx}" value="${i}" ${checked}><input type="text" class="opt-text" value="${val}" placeholder="選項 ${i+1}"></div>`;
+                }
+                div.innerHTML = `<input type="text" class="q-text" value="${q.q}" style="font-weight:bold;margin-bottom:10px;"><div class="options-list">${optsHTML}</div><div style="text-align:right;"><button class="btn-remove" onclick="this.parentElement.parentElement.remove()">刪除</button></div>`;
+                document.getElementById('quiz-container').appendChild(div);
+            });
+        } else if (type === 'word_unscramble') {
+            content.questions.forEach(q => {
+                document.getElementById('words-container').appendChild(createRow('pair-row', `<input type="text" class="input-w" value="${q.word}"><input type="text" class="input-h" value="${q.hint}"><button class="btn-remove" onclick="this.parentElement.remove()">X</button>`));
+            });
+        } else if (type === 'grouping') {
+            content.groups.forEach(g => {
+                document.getElementById('grouping-container').appendChild(createRow('pair-row', `<input type="text" class="input-g-name" value="${g.name}" style="flex:1;"><input type="text" class="input-g-items" value="${g.items.join(', ')}" style="flex:2;"><button class="btn-remove" onclick="this.parentElement.remove()">X</button>`));
+            });
+        } else if (type === 'missing_word') {
+            document.getElementById('missing-strict-mode').checked = (content.settings && content.settings.caseSensitive) || false;
+            content.questions.forEach(q => {
+                const originalLike = q.q.replace('_______', `[${q.a}]`);
+                document.getElementById('missing-container').appendChild(createRow('sentence-row', `<input type="text" class="input-m" value="${originalLike}"><button class="btn-remove" onclick="this.parentElement.remove()">X</button>`));
+            });
+        } else if (type === 'gap_fill') {
+            content.lines.forEach(line => {
+                document.getElementById('gap-container').appendChild(createRow('sentence-row', `<input type="text" class="input-gf" value="${line.text}" style="width:100%"><button class="btn-remove" onclick="this.parentElement.remove()">X</button>`));
+            });
+        } else if (type === 'spot_mistake') {
+            content.questions.forEach(q => {
+                document.getElementById('mistake-container').appendChild(createRow('pair-row', `<input type="text" class="input-ms-s" value="${q.sentence}" style="flex:2"><input type="text" class="input-ms-w" value="${q.target}" style="flex:1"><input type="text" class="input-ms-c" value="${q.correct}" style="flex:1"><button class="btn-remove" onclick="this.parentElement.remove()">X</button>`));
+            });
+        } else if (type === 'true_false') {
+            content.questions.forEach((q, i) => {
+                const uniqueName = 'tf_edit_' + i;
+                const checkT = q.a === true ? 'checked' : '';
+                const checkF = q.a === false ? 'checked' : '';
+                document.getElementById('tf-container').appendChild(createRow('pair-row', `<input type="text" class="input-tf-q" value="${q.q}" style="flex:2"><div style="flex:1;display:flex;gap:10px;"><label><input type="radio" name="${uniqueName}" value="true" ${checkT}>True</label><label><input type="radio" name="${uniqueName}" value="false" ${checkF}>False</label></div><button class="btn-remove" onclick="this.parentElement.remove()">X</button>`));
+            });
+        } else if (type === 'prompt_dealing' || type === 'prompt_flipping') {
+            content.cards.forEach(c => {
+                document.getElementById('prompts-container').appendChild(createRow('sentence-row', `<input type="text" class="input-prompt" value="${c}" style="width:100%"><button class="btn-remove" onclick="this.parentElement.remove()">X</button>`));
+            });
+        } else if (type === 'random_wheel') {
+            content.segments.forEach(s => {
+                document.getElementById('wheel-container').appendChild(createRow('sentence-row', `<input type="text" class="input-wheel" value="${s}" style="width:100%"><button class="btn-remove" onclick="this.parentElement.remove()">X</button>`));
+            });
+        } else if (type === 'maze_chase') {
+            content.questions.forEach(q => {
+                document.getElementById('maze-container').appendChild(createRow('sentence-row', `<input type="text" class="input-maze" value="${q.text}" style="width:100%"><button class="btn-remove" onclick="this.parentElement.remove()">X</button>`));
+            });
+        }
+    }
+
+    function createRow(className, innerHTML) {
+        const div = document.createElement('div');
+        div.className = className;
+        div.innerHTML = innerHTML;
+        return div;
+    }
+
+    // ==========================================
+    // Submit Logic
+    // ==========================================
+    function submitGame() {
+        const title = document.getElementById('game-title').value.trim();
+        const type = document.getElementById('game-type').value;
+        if (!title) { alert('請輸入標題'); return; }
+        
+        // ★ 新增：檢查標題是否重複 ★
+        // 規則：如果標題存在，且不是正在編輯的那個遊戲 (editingGameId)，則報錯
+        const duplicate = allGames.some(g => g.title === title && g.id !== editingGameId);
+        if (duplicate) {
+            alert('遊戲標題已存在，請使用不同的標題！');
+            return;
+        }
+
+        let contentData = collectContentData(type);
+        if (!contentData) return;
+
+        const btn = document.getElementById('btn-submit');
+        const st = document.getElementById('status');
+        btn.disabled = true; btn.innerText = "處理中...";
+        
+        const action = editingGameId ? 'updateGame' : 'createGame';
+        const body = { action: action, title, gameType: type, content: JSON.stringify(contentData) };
+        if (editingGameId) body.gameId = editingGameId;
+
+        fetch(GAS_URL, { method: 'POST', body: JSON.stringify(body) })
+        .then(r=>r.json()).then(d=>{
+            if(d.success) {
+                st.innerText = editingGameId ? "更新成功！" : "建立成功！";
+                st.className = 'success'; st.style.display='block';
+                // 成功後清空表單並回到管理列表
+                if(editingGameId) { 
+                    alert("更新成功");
+                    cancelEdit(); 
+                } else { 
+                    alert("建立成功");
+                    switchView('manage'); 
+                    resetEditors();
+                }
+            } else alert(d.error);
+        })
+        .catch(e=>{ st.className='error'; st.innerText=e.message; st.style.display='block'; btn.disabled=false; });
+    }
+
+    function collectContentData(type) {
+        let contentData = null;
+
+        if (type === 'quiz') {
+            const qs = [];
+            const qDivs = document.querySelectorAll('#quiz-container .quiz-item');
+            for (let i=0; i<qDivs.length; i++) {
+                const qt = qDivs[i].querySelector('.q-text').value.trim();
+                const rad = qDivs[i].querySelector('input[type="radio"]:checked');
+                if(!qt) continue; 
+                if(!rad) { alert(`未選正確答案`); return null; }
+                const opts = [];
+                qDivs[i].querySelectorAll('.opt-text').forEach(o => { if(o.value.trim()) opts.push(o.value.trim()); });
+                const ans = qDivs[i].querySelectorAll('.opt-text')[rad.value].value.trim();
+                qs.push({ q:qt, options:opts, a:ans });
+            }
+            if(qs.length===0) {alert('至少一題'); return null;}
+            contentData = { questions: qs };
+        
+        } else if (type === 'match_up' || type === 'flip_tiles') {
+            const ps = [];
+            document.querySelectorAll('#pairs-container .pair-row').forEach((r,i) => {
+                const q=r.querySelector('.input-q').value.trim();
+                const a=r.querySelector('.input-a').value.trim();
+                if(q&&a) ps.push({id:i+1,q,a});
+            });
+            contentData = { pairs: ps };
+        
+        } else if (type === 'unscramble') {
+            const qs = [];
+            document.querySelectorAll('#sentences-container .sentence-row').forEach((r,i) => {
+                const t=r.querySelector('.input-s').value.trim();
+                if(t) qs.push({id:i+1,text:t,segments:t.split(/\s+/)});
+            });
+            contentData = { questions: qs };
+        
+        } else if (type === 'word_unscramble') {
+            const qs = [];
+            document.querySelectorAll('#words-container .pair-row').forEach((r, i) => {
+                const w = r.querySelector('.input-w').value.trim();
+                const h = r.querySelector('.input-h').value.trim();
+                if (w) qs.push({ id: i + 1, word: w, hint: h });
+            });
+            if (qs.length === 0) { alert('至少輸入一個單字'); return null; }
+            contentData = { questions: qs };
+        
+        } else if (type === 'grouping') {
+            const groups = [];
+            document.querySelectorAll('#grouping-container .pair-row').forEach(r => {
+                const name = r.querySelector('.input-g-name').value.trim();
+                const itemsStr = r.querySelector('.input-g-items').value.trim();
+                if (name && itemsStr) {
+                    const items = itemsStr.split(',').map(i => i.trim()).filter(i => i);
+                    groups.push({ name: name, items: items });
+                }
+            });
+            if (groups.length < 2) { alert('至少需要兩個分類群組'); return null; }
+            contentData = { groups: groups };
+        
+        } else if (type === 'missing_word') {
+            const qs = [];
+            const regex = /\[(.*?)\]/; 
+            let isValid = true;
+            document.querySelectorAll('#missing-container .sentence-row').forEach((r, i) => {
+                const fullText = r.querySelector('.input-m').value.trim();
+                if (fullText) {
+                    const match = fullText.match(regex);
+                    if (match && match[1]) {
+                        const answer = match[1].trim(); 
+                        const questionText = fullText.replace(regex, '_______');
+                        qs.push({ id: i + 1, q: questionText, a: answer });
+                    } else {
+                        alert(`格式錯誤！請確認有使用 [ ] 包住答案。`);
+                        isValid = false;
+                    }
+                }
+            });
+            const isStrict = document.getElementById('missing-strict-mode').checked;
+            if (!isValid) return null;
+            if (qs.length === 0) { alert('至少輸入一題'); return null; }
+            contentData = { questions: qs, settings: { caseSensitive: isStrict } };
+
+        } else if (type === 'gap_fill') {
+            const lines = [];
+            const regex = /\[(.*?)\]/g; 
+            let totalGaps = 0;
+            document.querySelectorAll('#gap-container .sentence-row').forEach((r, i) => {
+                const text = r.querySelector('.input-gf').value.trim();
+                if (text) {
+                    const answers = [];
+                    let match;
+                    while ((match = regex.exec(text)) !== null) answers.push(match[1]);
+                    if (answers.length > 0) {
+                        lines.push({ id: i + 1, text: text, answers: answers });
+                        totalGaps += answers.length;
+                    } else {
+                        lines.push({ id: i + 1, text: text, answers: [] });
+                    }
+                }
+            });
+            if (totalGaps === 0) { alert('請至少挖空一個單字'); return null; }
+            contentData = { lines: lines };
+
+        } else if (type === 'spot_mistake') {
+            const qs = [];
+            document.querySelectorAll('#mistake-container .pair-row').forEach((r, i) => {
+                const s = r.querySelector('.input-ms-s').value.trim();
+                const w = r.querySelector('.input-ms-w').value.trim();
+                const c = r.querySelector('.input-ms-c').value.trim();
+                if (s && w && c) {
+                    if (!s.includes(w)) { alert(`「${w}」不在句子中！`); return; }
+                    qs.push({ id: i + 1, sentence: s, target: w, correct: c });
+                }
+            });
+            if (qs.length === 0) { alert('至少輸入一題'); return null; }
+            contentData = { questions: qs };
+
+        } else if (type === 'true_false') {
+            const qs = [];
+            document.querySelectorAll('#tf-container .pair-row').forEach((r, i) => {
+                const q = r.querySelector('.input-tf-q').value.trim();
+                const isTrue = r.querySelector('input[type="radio"]:checked').value === 'true';
+                if (q) qs.push({ id: i + 1, q: q, a: isTrue });
+            });
+            if (qs.length === 0) { alert('至少輸入一題'); return null; }
+            contentData = { questions: qs };
+
+        } else if (type === 'prompt_dealing' || type === 'prompt_flipping') {
+            const cards = [];
+            document.querySelectorAll('#prompts-container .input-prompt').forEach(input => {
+                const val = input.value.trim();
+                if (val) cards.push(val);
+            });
+            if (cards.length === 0) { alert('至少輸入一張卡牌'); return null; }
+            contentData = { cards: cards };
+
+        } else if (type === 'random_wheel') {
+            const segments = [];
+            document.querySelectorAll('#wheel-container .input-wheel').forEach(input => {
+                const val = input.value.trim();
+                if (val) segments.push(val);
+            });
+            if (segments.length < 2) { alert('轉盤至少需要兩個選項'); return null; }
+            contentData = { segments: segments };
+
+        } else if (type === 'maze_chase') {
+            const qs = [];
+            document.querySelectorAll('#maze-container .input-maze').forEach((r, i) => {
+                const t = r.value.trim();
+                if (t) qs.push({ id: i+1, text: t, segments: t.split(/\s+/) });
+            });
+            if (qs.length === 0) { alert('至少輸入一個句子'); return null; }
+            contentData = { questions: qs };
+        }
+        
+        return contentData;
+    }
+
+    // --- Results Logic ---
+    function fetchRecords() {
+            const tbody = document.getElementById('records-body');
+            // 加上載入中的提示
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#666;">資料讀取中...</td></tr>';
+            
+            fetch(GAS_URL + '?action=getRecords')
+            .then(res => res.json())
+            .then(d => {
+                if (d.records) { 
+                    allRecords = d.records; 
+                    filterRecords(); 
+                } else {
+                    // 如果回傳沒有 records 欄位，視為無資料
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">目前無資料</td></tr>';
+                }
+            })
+            .catch(err => {
+                // ★ 關鍵修正：發生錯誤時顯示，而不是一直卡在讀取中
+                console.error(err);
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red;">讀取失敗，請檢查網路或 GAS 連結。<br>(${err.message})</td></tr>`;
+            });
+        }
+
+    function filterRecords() {
+        const k = document.getElementById('filter-text').value.toLowerCase();
+        
+        // ★ 修正重點：使用 String() 強制轉型，避免數字相加變成數學運算
+        const list = allRecords.filter(r => {
+            const combinedText = (String(r.class) + String(r.name) + String(r.gameTitle) + String(r.no)).toLowerCase();
+            return combinedText.includes(k);
+        });
+
+        const tbody = document.getElementById('records-body');
+        tbody.innerHTML = '';
+        
+        if (list.length === 0) {
+             tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">無符合搜尋的資料</td></tr>';
+             return;
+        }
+
+        list.forEach(r => {
+            const tr = document.createElement('tr');
+            const dateStr = r.timestamp ? new Date(r.timestamp).toLocaleDateString() : '-';
+            
+            // 依據分數高低給予顏色樣式 (可選)
+            let scoreClass = '';
+            if (r.score >= 80) scoreClass = 'score-high';
+            else if (r.score < 60) scoreClass = 'score-low';
+
+            tr.innerHTML = `
+                <td>${dateStr}</td>
+                <td>${r.gameTitle}</td>
+                <td>${r.class}</td>
+                <td>${r.no}</td>
+                <td>${r.name}</td>
+                <td class="${scoreClass}">${r.score}</td>
+                <td>${r.time}s</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // --- Helpers (Button Actions) ---
+    function addPair() { document.getElementById('pairs-container').appendChild(createRow('pair-row', `<input type="text" class="input-q" placeholder="題目"><input type="text" class="input-a" placeholder="答案"><button class="btn-remove" onclick="this.parentElement.remove()">X</button>`)); }
+    function addSentence() { const d=createRow('sentence-row', `<div style="flex:1;"><input type="text" class="input-s" placeholder="輸入句子" oninput="previewSegments(this)" style="width:100%;"><div class="preview-tags"></div></div><button class="btn-remove" onclick="this.parentElement.remove()">X</button>`); document.getElementById('sentences-container').appendChild(d); }
+    function previewSegments(input) { const c=input.nextElementSibling; const t=input.value.trim(); if(!t){c.innerHTML='';return;} c.innerHTML=t.split(/\s+/).map(s=>`<span class="tag">${s}</span>`).join(''); }
+    function addQuizQuestion() { const c=document.getElementById('quiz-container'); const i=c.children.length; const d=document.createElement('div'); d.className='quiz-item'; d.innerHTML=`<input type="text" class="q-text" placeholder="問題..."><div class="options-list">${[0,1,2,3].map(k=>`<div class="option-row"><input type="radio" name="q-${i}" value="${k}"><input type="text" class="opt-text" placeholder="選項"></div>`).join('')}</div><button class="btn-remove" onclick="this.parentElement.parentElement.remove()">刪除</button>`; c.appendChild(d); }
+    function addWordQuestion() { document.getElementById('words-container').appendChild(createRow('pair-row', `<input type="text" class="input-w" placeholder="單字"><input type="text" class="input-h" placeholder="提示"><button class="btn-remove" onclick="this.parentElement.remove()">X</button>`)); }
+    function addGroupRow() { document.getElementById('grouping-container').appendChild(createRow('pair-row', `<input type="text" class="input-g-name" style="flex:1" placeholder="分類"><input type="text" class="input-g-items" style="flex:2" placeholder="項目"><button class="btn-remove" onclick="this.parentElement.remove()">X</button>`)); }
+    function addMissingRow() { document.getElementById('missing-container').appendChild(createRow('sentence-row', `<input type="text" class="input-m" placeholder="例: I [am] happy."><button class="btn-remove" onclick="this.parentElement.remove()">X</button>`)); }
+    function addGapRow() { document.getElementById('gap-container').appendChild(createRow('sentence-row', `<input type="text" class="input-gf" style="width:100%" placeholder="填空句子"><button class="btn-remove" onclick="this.parentElement.remove()">X</button>`)); }
+    function addMistakeRow() { document.getElementById('mistake-container').appendChild(createRow('pair-row', `<input type="text" class="input-ms-s" style="flex:2" placeholder="錯句"><input type="text" class="input-ms-w" style="flex:1" placeholder="錯字"><input type="text" class="input-ms-c" style="flex:1" placeholder="正解"><button class="btn-remove" onclick="this.parentElement.remove()">X</button>`)); }
+    function addTFRow() { const u='tf_'+Date.now()+Math.random(); document.getElementById('tf-container').appendChild(createRow('pair-row', `<input type="text" class="input-tf-q" style="flex:2" placeholder="題目"><div style="flex:1;display:flex;gap:10px;"><label><input type="radio" name="${u}" value="true" checked>True (O)</label><label><input type="radio" name="${u}" value="false">False (X)</label></div><button class="btn-remove" onclick="this.parentElement.remove()">X</button>`)); }
+    function addPromptRow() { document.getElementById('prompts-container').appendChild(createRow('sentence-row', `<input type="text" class="input-prompt" style="width:100%" placeholder="任務"><button class="btn-remove" onclick="this.parentElement.remove()">X</button>`)); }
+    function addWheelSegment() { document.getElementById('wheel-container').appendChild(createRow('sentence-row', `<input type="text" class="input-wheel" style="width:100%" placeholder="選項"><button class="btn-remove" onclick="this.parentElement.remove()">X</button>`)); }
+    function addMazeRow() { document.getElementById('maze-container').appendChild(createRow('sentence-row', `<input type="text" class="input-maze" style="width:100%" placeholder="迷宮句子"><button class="btn-remove" onclick="this.parentElement.remove()">X</button>`)); }
+</script>
+</body>
+</html>
